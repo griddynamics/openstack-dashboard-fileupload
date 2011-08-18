@@ -1,0 +1,2 @@
+cp dashboard /usr/lib/python2.6/
+cp django_openstack /usr/lib/python2.6/
