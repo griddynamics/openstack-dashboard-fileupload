@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+
+{% block sidebar %}
+    {% include 'projadmin/sidebar.html' %}
+{% endblock %}
+
+{% block main %}
+    <div id="page_header">
+    <h2>Upload Image</h2>
+    </div>
+    <div class="main_content">
+	<div class="message_box error" style="display:none" id="error_box">
+	    <h2>Error</h2>
+	    <p>Image could not be uploaded, please try again.</p>
+	</div>
+	<div class="dash_block">
+	    
+	    <div class="left">
+	    
+		Image Type: </br>
+		<select>
+		    <option value="ami" selected>AMI</option>
+		    <option value="qcow">QCOW2</option>
+		</select>
+		</br></br>
+		
+		<div class="qcow2" style="display:none">
+		    <form style="width:250px;" onSubmit="return uploadFile2()">
+			<label for="title">Title:</label>
+			<ul class="errorlist" style="display:none" id="err_title"><li>This field is required.</li></ul>
+			<input type="text" name="title" id="title"/>
+			<label for="image">Image:</label>
+			<ul class="errorlist" style="display:none" id="err_image"><li>This field is required.</li></ul>
+			<input type="file" name="image" id="image"/><br /><br />
+			<input type="submit" value="Upload"><br/>
+		    </form>
+		</div>
+		
+		<div class="ami">
+		    <form style="width:250px;" onSubmit="return uploadFile()">
+			
+			{% for field in form.visible_fields %}
+			
+			<div>
+			
+			    {{ field.label_tag }}
+			    <ul class="errorlist" style="display:none" id="err_{{forloop.counter}}"><li>This field is required.</li></ul>
+			    {{ field }}</div>
+			{% endfor %}
+			<br/>
+			<input type="submit" value="Upload"/>
+			
+		    </form>
+		    <br/>
+		</div>
+		
+	    </div>
+	    
+	    
+	    <div class="right" id="default">
+		<h3>Description:</h3>
+		<br />
+		<p>From here you can upload an image. </p>
+	    </div>
+	    <div class="rigth" id="upload" style="display:none">
+		<h3>Uploading progress:</h3>
+		<br />
+		<div>Loaded: <span class="progress"></span></div>
+		<p>Percent: <span class="percent"></span>%</p>
+		<p>Speed: <span class="speed"></span> kbps</p>
+		<p>Average Speed: <span class="avg"></span> kbps</p>
+		<p>ETA: <span class="eta"></span> s</p>
+	    </div>
+	    <div class="right" id="upload_error" style="display:none; color:red">
+		<h3>Error during upload process</h3>
+		<br />
+		<p>Uploading process has been stopped. Please try to upload files again</p>
+	    </div>
+	    
+	    <div class="clear">&nbsp</div>
+	    
+	</div>
+    </div>
+    
+{% endblock %}
+{% block footer_js %}
+
+<script>
+      $("select").change(function(){
+		if ($("select option:selected").attr("value") == "ami"){
+		    $("div.qcow2").hide();
+		    $("div.ami").show();
+		}
+		else{
+		    $("div.qcow2").show();
+		    $("div.ami").hide();
+		}
+	    });
+	
+	
+      function uploadFile(event) {
+	error = false;
+
+        $("div.success").html("Loading...");
+        var xhr = new XMLHttpRequest();
+        var fd = new FormData();
+        fd.append("name", document.getElementById('id_title').value);
+        if (document.getElementById('id_title').value == ""){
+    	    $("#err_1").show();
+    	    error = true;
+        }
+        kernel = document.getElementById('id_kernel').files[0];
+        initrd = document.getElementById('id_initrd').files[0];
+        rootfs = document.getElementById('id_rootfs').files[0];
+	if (kernel == null) {
+	    $("#err_2").show();
+	    error = true;
+	}
+    	if (initrd == null) {
+	    $("#err_3").show();
+	    error = true;
+	}
+    	if (rootfs == null) {
+	    $("#err_4").show();
+	    error = true;
+	}
+        
+        if (error){
+    	    $("#error_box").show();
+    	    return false;
+    	}
+    	else {
+    	    $("#error_box").hide();
+    	    for (i = 1; i < 5; i++)
+    		$("#err_"+i).hide();
+    	    update();
+    	    prepare_upload();
+    	    
+    	}
+
+    	fd.append("kernel", kernel);
+    	fd.append("initrd", initrd);
+        fd.append("rootfs", rootfs);
+        xhr.upload.addEventListener("progress", progress, false);
+        xhr.addEventListener("load", success, false);
+        xhr.addEventListener("error", error_proc, false);
+        xhr.open("POST", "../js/", true);
+        xhr.send(fd);        
+
+	
+        return false;
+      }
+
+      function uploadFile2(event) {
+	error = false;
+        $("div.success").html("Loading...");
+        var xhr = new XMLHttpRequest();
+        var fd = new FormData();
+        if (document.getElementById('title').value == ""){
+	    $("#err_title").show();
+    	    error = true;
+        }
+        if (document.getElementById('image').files[0] == null){
+    	    $("#err_image").show();
+    	    error = true;
+        }
+        fd.append("name", document.getElementById('title').value);
+        fd.append("rootfs", document.getElementById('image').files[0]);
+        
+        if (error)
+        {
+    	    $("#error_box").show();
+    	    return false;
+    	}
+    	else {
+    	    prepare_upload();
+    	    $("#error_box").hide();
+    	    $("#err_title").hide();
+    	    $("#err_image").hide();
+    	    update();
+    	}
+        
+        xhr.upload.addEventListener("progress", progress, false);
+        xhr.addEventListener("load", success, false);
+        xhr.addEventListener("error", error_proc, false);
+        xhr.open("POST", "../js/", true);
+        xhr.send(fd);
+        
+        return false;
+      }
+      
+      function success() {
+        $("div.progress").html("");
+        $("div.success").html("Loaded!");
+        window.location = "{% url projadmin/forward %}"
+      }
+
+      prev_time = (new Date()).getTime();
+      prev_size = 0;
+      
+      speeds = [];
+      avg = 0;
+      eta = 0;
+      speed = 0;
+      
+      function progress(evt) {
+        full_size = evt.total;
+        $("span.progress").html(evt.loaded + '/' + evt.total );
+        $("span.percent").html(((evt.loaded/evt.total)*100).toFixed(2));
+        current_time = (new Date()).getTime();
+        time_deltha = current_time - prev_time;
+        size_deltha = evt.loaded - prev_size;
+        
+        if (time_deltha > 0)
+    	    speed = size_deltha/time_deltha;
+        else
+    	    speed = size_deltha;
+        
+        prev_time = current_time;
+        prev_size = evt.loaded;
+        
+    	speeds.push(speed)
+        
+        avg = 0;
+        for (i = 0; i < speeds.length; i++){
+          avg += speeds[i];
+        }
+        
+        avg /= speeds.length;
+        eta = Math.round(((evt.total - prev_size)/speed)/1000);
+      }
+      
+      function update(){
+        $("span.speed").html(speed.toFixed(2));
+        $("span.avg").html(avg.toFixed(2));
+        $("span.eta").html(eta);
+        setTimeout(update, 1000);
+      }
+      
+      function prepare_upload(){
+        $("#default").hide();
+        $("#upload").show();
+        $("input").attr("disabled", "true");
+        $("#upload_error").hide();
+      }
+      
+      function error_proc(evt){
+        $("#upload").hide();
+        $("#upload_error").show();
+        $("input").attr("disabled", "false");
+      }
+</script>
+
+{% endblock %}
